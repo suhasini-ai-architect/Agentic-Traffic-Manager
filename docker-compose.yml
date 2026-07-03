@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  gateway-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: guardian-mesh-api:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:////workspace/data/atm_logs.db
+      - OLLAMA_URL=http://host.docker.internal:11434/api/generate
+      - LLM_MODEL_NAME=tinydolphin
+    volumes:
+      - ./local_data:/workspace/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  governance-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: guardian-mesh-ui:latest
+    ports:
+      - "8501:8501"
+    environment:
+      - GATEWAY_URL=http://gateway-api:8000/v1/proxy
+      - PYTHONPATH=.
+    volumes:
+      - ./local_data:/workspace/data
+    command: ["streamlit", "run", "dashboard/ui.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    depends_on:
+      - gateway-api
+    restart: unless-stopped
