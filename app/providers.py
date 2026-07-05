@@ -1,11 +1,9 @@
-import os  # <--- THIS IS WHAT WAS MISSING!
+import os
 import abc
 import httpx
 
-# --- ADD THESE TWO CONFIGURATION LINES TO THE TOP ---
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
-MODEL_NAME = os.getenv("LLM_MODEL_NAME", "tinydolphin") # or "phi4" / whatever model you run locally
-# ---------------------------------------------------
+MODEL_NAME = os.getenv("LLM_MODEL_NAME", "tinydolphin")
 
 class LLMProvider(abc.ABC):
     @abc.abstractmethod
@@ -35,14 +33,11 @@ class AzureOpenAIProvider(LLMProvider):
             return resp.json()["choices"][0]["message"]["content"]
 
 class AWSBedrockProvider(LLMProvider):
-    # Abstracted placeholder demonstrating multi-cloud integration patterns
     def __init__(self, region: str):
         self.region = region
     async def generate(self, prompt: str) -> str:
-        # High-performance AWS SigV4 signing orchestration block would reside here
         return "AWS Bedrock Mock Response"
 
-# Factory Pattern to dynamically resolve routing layer at startup
 def get_provider() -> LLMProvider:
     target = os.getenv("UPSTREAM_PROVIDER", "OLLAMA").upper()
     if target == "AZURE":
@@ -54,5 +49,3 @@ def get_provider() -> LLMProvider:
     elif target == "AWS":
         return AWSBedrockProvider(region=os.getenv("AWS_REGION", "us-east-1"))
     return OllamaProvider(url=OLLAMA_URL, model=MODEL_NAME)
-
-llm_provider = get_provider()

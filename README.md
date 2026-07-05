@@ -28,7 +28,7 @@ By separating application consuming planes from raw model boundaries, Guardian-M
 
 Principal Architecture, FinOps Optimization & Zero-Trust Telemetry Fabric...
 
-![Guardian-Mesh Demo](path/to/your/demo.gif)
+![Guardian-Mesh Demo](asset/demo.gif)
 
 ---
 

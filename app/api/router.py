@@ -83,8 +83,39 @@ async def proxy_request(request: Request):
         if not raw_prompt:
             raise HTTPException(status_code=400, detail="Payload execution requires a valid prompt string.")
 
-        # LAYER 1: FinOps Optimization (Semantic Vector Match)
-        cached_response = global_cache.get_cached_response(raw_prompt)
+        # =============================================================
+        # LAYER 1: Input Security (Injection Guard Plane)
+        # =============================================================
+        if injection_shield.is_malicious(raw_prompt):
+            latency = time.time() - start_time
+            log_event(ATMLog(
+                session_id=session_id, prompt=raw_prompt, response="[BLOCKED]",
+                status="BLOCKED_INJECTION", reason="Security Guard Violation: Malicious prompt injection detected.", 
+                tokens=0, latency=latency
+            ))
+            return {"status": "blocked", "reason": "security_violation"}
+
+        # =============================================================
+        # LAYER 2: Governance Compliance (Data Sanitization Plane)
+        # =============================================================
+        scrubbed_prompt, found_pii = pii_guard.scrub(raw_prompt)
+        
+        if found_pii and strict_mode:
+            latency = time.time() - start_time
+            log_event(ATMLog(
+                session_id=session_id, prompt=raw_prompt, response="[BLOCKED]",
+                status="BLOCKED_COMPLIANCE", reason="Strict Policy Violation: PII leaked.", 
+                tokens=0, latency=latency
+            ))
+            return {"status": "blocked", "reason": "compliance_violation"}
+            
+        status_flag = "PASSED_WITH_REDACTION" if found_pii else "PASSED_CLEAN"
+
+        # =============================================================
+        # LAYER 3: FinOps Optimization (Semantic Vector Match)
+        # =============================================================
+        # CRITICAL SECURITY FIX: Cache lookups map against clean scrubbed structures only!
+        cached_response = global_cache.get_cached_response(scrubbed_prompt)
         if cached_response:
             latency = time.time() - start_time
             log_event(ATMLog(
@@ -95,37 +126,15 @@ async def proxy_request(request: Request):
                 "response": cached_response, 
                 "metrics": {"status": "cache_hit", "latency_seconds": latency}
             }
-
-        # LAYER 2: Input Security (Injection Guard Plane)
-        if injection_shield.is_malicious(raw_prompt):
-            latency = time.time() - start_time
-            log_event(ATMLog(
-                session_id=session_id, prompt=raw_prompt, response="[BLOCKED]",
-                status="BLOCKED_INJECTION", reason="Security Guard Violation: Malicious prompt injection detected.", 
-                tokens=0, latency=latency
-            ))
-            return {"status": "blocked", "reason": "security_violation"}
-
-        # LAYER 3: Governance Compliance (Data Sanitization Plane)
-        scrubbed_prompt, found_pii = pii_guard.scrub(raw_prompt)
         
-        if found_pii and strict_mode:
-            latency = time.time() - start_time
-            log_event(ATMLog(
-                session_id=session_id, prompt=raw_prompt, response="[BLOCKED]",
-                status="BLOCKED_COMPLIANCE", reason=f"Strict Policy Violation: PII leaked.", 
-                tokens=0, latency=latency
-            ))
-            return {"status": "blocked", "reason": "compliance_violation"}
-            
-        status_flag = "PASSED_WITH_REDACTION" if found_pii else "PASSED_CLEAN"
-        
+        # =============================================================
         # LAYER 4: Upstream Orchestration (Dynamic Provider Execution)
+        # =============================================================
         print(f"🔗 Routing sanitized tokens via provider engine mapping...")
         llm_response = await llm_provider.generate(scrubbed_prompt)
 
         # LAYER 5: Post-Execution Telemetry (Persistence & Vector Update)
-        global_cache.update_cache(raw_prompt, llm_response)
+        global_cache.update_cache(scrubbed_prompt, llm_response)
         
         latency = time.time() - start_time
         log_event(ATMLog(
