@@ -62,8 +62,21 @@ with st.sidebar:
     st.info("Operating Mode: **Hybrid-Tenant Governance**")
     
     model_choice = st.selectbox("Active LLM Cluster", ["Phi-4 Mini (Local)", "Azure OpenAI Endpoint", "AWS Bedrock Core"])
-    scrub_level = st.select_slider("Scrubbing Strictness", options=["Audit Only", "Standard Mitigation", "Strict Enforcement"])
     
+    # --- ENHANCED SIDEBAR SCRUBBING LAYER UX ---
+    scrub_level = st.select_slider(
+        "Scrubbing Strictness", 
+        options=["Audit Only", "Standard Mitigation", "Strict Enforcement"]
+    )
+
+    # Dynamic state indicator injection based on real-time selections
+    if scrub_level == "Audit Only":
+        st.markdown("State: <span style='color:#ff4b4b; font-weight:bold;'>⚠️ Monitoring Mode</span>", unsafe_allow_html=True)
+    elif scrub_level == "Standard Mitigation":
+        st.markdown("State: <span style='color:#ffa500; font-weight:bold;'>🛡️ Passive Redaction</span>", unsafe_allow_html=True)
+    else:
+        st.markdown("State: <span style='color:#00ffcc; font-weight:bold;'>⚡ Strict Zero-Trust Inline Block</span>", unsafe_allow_html=True)
+
     # Map UI selection string to primitive boolean configuration
     is_strict = True if scrub_level == "Strict Enforcement" else False
     
@@ -134,5 +147,7 @@ with right_col:
         st.caption("No pipeline logs parsed out of SQLite cluster database storage yet.")
     st.divider()
     st.subheader("🔍 Proxy Topography Matrix")
-    st.image("https://img.icons8.com/color/96/000000/network-mesh.png", width=45)
+    
+    # Clean, unbreakable native layout component replacement
+    st.info("🌐 **Active Node Mesh Topology Connected**")
     st.caption("Stateless architectural layout processing inbound tokens dynamically before upstream vendor models.")
