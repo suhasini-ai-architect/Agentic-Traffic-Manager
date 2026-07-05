@@ -78,6 +78,7 @@ async def proxy_request(request: Request):
         body = await request.json()
         session_id = body.get("session_id", "anonymous-session")
         raw_prompt = body.get("prompt", "")
+        strict_mode = body.get("strict_mode", False)
         
         if not raw_prompt:
             raise HTTPException(status_code=400, detail="Payload execution requires a valid prompt string.")
@@ -107,8 +108,18 @@ async def proxy_request(request: Request):
 
         # LAYER 3: Governance Compliance (Data Sanitization Plane)
         scrubbed_prompt, found_pii = pii_guard.scrub(raw_prompt)
+        
+        if found_pii and strict_mode:
+            latency = time.time() - start_time
+            log_event(ATMLog(
+                session_id=session_id, prompt=raw_prompt, response="[BLOCKED]",
+                status="BLOCKED_COMPLIANCE", reason=f"Strict Policy Violation: PII leaked.", 
+                tokens=0, latency=latency
+            ))
+            return {"status": "blocked", "reason": "compliance_violation"}
+            
         status_flag = "PASSED_WITH_REDACTION" if found_pii else "PASSED_CLEAN"
-
+        
         # LAYER 4: Upstream Orchestration (Dynamic Provider Execution)
         print(f"🔗 Routing sanitized tokens via provider engine mapping...")
         llm_response = await llm_provider.generate(scrubbed_prompt)
