@@ -8,11 +8,14 @@ from fastapi import APIRouter, HTTPException, Request
 from app.db.session import log_event, ATMLog
 from app.semantic_cache import global_cache
 
+# Import the new provider factory pattern you created
+from app.providers import get_provider
+
 router = APIRouter()
 
-# Infrastructure Cluster Configurations via Env Variables
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
-MODEL_NAME = os.getenv("LLM_MODEL_NAME", "tinydolphin")
+# Initialize the cluster provider globally at startup based on environment variables
+llm_provider = get_provider()
+PROVIDER_TYPE = os.getenv("UPSTREAM_PROVIDER", "OLLAMA").upper()
 
 # -------------------------------------------------------------
 # ADVANCED ENTERPRISE SECURITY GUARDS
@@ -68,7 +71,7 @@ async def proxy_request(request: Request):
     """
     Zero-Trust Interception Pipeline acting as a state-monitored proxy.
     """
-    print("\n--- 🛡️ NEW PROXY TRANSMISSION INTERCEPTED ---")
+    print(f"\n--- 🛡️ NEW PROXY TRANSMISSION INTERCEPTED [{PROVIDER_TYPE}] ---")
     start_time = time.time()
     
     try:
@@ -106,16 +109,9 @@ async def proxy_request(request: Request):
         scrubbed_prompt, found_pii = pii_guard.scrub(raw_prompt)
         status_flag = "PASSED_WITH_REDACTION" if found_pii else "PASSED_CLEAN"
 
-        # LAYER 4: Upstream Orchestration (Async Non-blocking Cluster Forwarding)
-        print(f"🔗 Routing sanitised tokens to model instance [{MODEL_NAME}]...")
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                OLLAMA_URL,
-                json={"model": MODEL_NAME, "prompt": scrubbed_prompt, "stream": False},
-                timeout=120.0
-            )
-            resp.raise_for_status()
-            llm_response = resp.json().get("response", "")
+        # LAYER 4: Upstream Orchestration (Dynamic Provider Execution)
+        print(f"🔗 Routing sanitized tokens via provider engine mapping...")
+        llm_response = await llm_provider.generate(scrubbed_prompt)
 
         # LAYER 5: Post-Execution Telemetry (Persistence & Vector Update)
         global_cache.update_cache(raw_prompt, llm_response)
@@ -137,8 +133,8 @@ async def proxy_request(request: Request):
         }
 
     except httpx.HTTPError as exc:
-        print(f"❌ Core LLM Infrastructure Unreachable: {exc}")
-        raise HTTPException(status_code=502, detail="Upstream compute cluster offline or degraded.")
+        print(f"❌ Upstream Infrastructure Provider Unreachable: {exc}")
+        raise HTTPException(status_code=502, detail=f"Upstream compute cluster [{PROVIDER_TYPE}] offline or degraded.")
     except Exception as e:
         print(f"❌ Internal Fabric Fault: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Architecture System Fault.")
